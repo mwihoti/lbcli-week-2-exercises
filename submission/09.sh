@@ -13,8 +13,7 @@ RBF_SEQ=4294967293
 
 TXID=$(bitcoin-cli -regtest decoderawtransaction "$BASE_TX" | jq -r .txid)
 
-read -r VOUT0_SATS VOUT1_SATS <<< "$(bitcoin-cli -regtest decoderawtransaction "$BASE_TX" | jq -r '.vout[0].value, .vout[1].value' | awk '{printf "%.0f\n", $1*1e8}')"
-TOTAL_SATS=$((VOUT0_SATS + VOUT1_SATS))
+TOTAL_SATS=$(bitcoin-cli -regtest decoderawtransaction "$BASE_TX" | jq '[.vout[].value] | add | . * 1e8 | floor')
 CHANGE_SATS=$((TOTAL_SATS - PAY_SATS - FEE_SATS))
 
 if [ "$CHANGE_SATS" -lt 0 ]; then echo "ERROR: insufficient funds" >&2; exit 1; fi
