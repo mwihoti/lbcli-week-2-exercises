@@ -9,16 +9,14 @@ BASE_TX="01000000000101c8b0928edebbec5e698d5f86d0474595d9f6a5b2e4e3772cd9d1005f2
 TARGET="2MvLcssW49n9atmksjwg2ZCMsEMsoj3pzUP"
 PAY_SATS=20000000
 FEE_SATS=10000
-RBF_SEQ=4294967293  # < 4294967294 enables RBF
+RBF_SEQ=4294967293
 
 TXID=$(bitcoin-cli -regtest decoderawtransaction "$BASE_TX" | jq -r .txid)
-VOUT_INDEX=$(bitcoin-cli -regtest decoderawtransaction "$BASE_TX" \
-  | jq -r 'to_entries[] | "\(.key) \(.value.value)"' \
-  | awk -v want=$PAY_SATS 'BEGIN{FS=" "}{ if ($2*1e8 >= want) { print $1; exit }}')
-if [ -z "$VOUT_INDEX" ]; then echo "ERROR: no suitable vout" >&2; exit 1; fi
 
-UTXO_SATS=$(bitcoin-cli -regtest decoderawtransaction "$BASE_TX" | jq -r ".vout[$VOUT_INDEX].value" | awk '{printf "%.0f\n",$1*1e8}')
-CHANGE_SATS=$((UTXO_SATS - PAY_SATS - FEE_SATS))
+read -r VOUT0_SATS VOUT1_SATS <<< "$(bitcoin-cli -regtest decoderawtransaction "$BASE_TX" | jq -r '.vout[0].value, .vout[1].value' | awk '{printf "%.0f\n", $1*1e8}')"
+TOTAL_SATS=$((VOUT0_SATS + VOUT1_SATS))
+CHANGE_SATS=$((TOTAL_SATS - PAY_SATS - FEE_SATS))
+
 if [ "$CHANGE_SATS" -lt 0 ]; then echo "ERROR: insufficient funds" >&2; exit 1; fi
 
 CHANGE_ADDR=$(bitcoin-cli -regtest getrawchangeaddress)
@@ -26,7 +24,7 @@ toBTC(){ awk "BEGIN{printf \"%.8f\", $1/1e8}"; }
 PAY_BTC=$(toBTC $PAY_SATS)
 CHANGE_BTC=$(toBTC $CHANGE_SATS)
 
-INPUTS="[ {\"txid\":\"$TXID\",\"vout\":$VOUT_INDEX,\"sequence\":$RBF_SEQ} ]"
+INPUTS="[{\"txid\":\"$TXID\",\"vout\":0,\"sequence\":$RBF_SEQ},{\"txid\":\"$TXID\",\"vout\":1,\"sequence\":$RBF_SEQ}]"
 OUTPUTS="{\"$TARGET\":$PAY_BTC,\"$CHANGE_ADDR\":$CHANGE_BTC}"
 
 RAW=$(bitcoin-cli -regtest createrawtransaction "$INPUTS" "$OUTPUTS")

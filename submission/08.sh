@@ -11,7 +11,7 @@ FEE_SATS=20000
 
 TXID=$(bitcoin-cli -regtest decoderawtransaction "$BASE_TX" | jq -r .txid)
 VOUT_INDEX=$(bitcoin-cli -regtest decoderawtransaction "$BASE_TX" \
-  | jq -r 'to_entries[] | "\(.key) \(.value.value)"' \
+  | jq -r '.vout | to_entries[] | "\(.key) \(.value.value)"' \
   | awk -v fee=$FEE_SATS 'BEGIN{FS=" "}{ if ($2*1e8 > fee) { print $1; exit }}')
 
 if [ -z "$VOUT_INDEX" ]; then
